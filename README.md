@@ -2,7 +2,7 @@
 
 Controllo locale di un climatizzatore Daikin con interfaccia S21 tramite
 Wemos D1 mini (ESP8266), con pagina web integrata e senza Home Assistant.
-Versione corrente: **2.14**. Progetto indipendente, non affiliato a Daikin.
+Versione corrente: **2.15**. Progetto indipendente, non affiliato a Daikin.
 
 Sviluppato per **FTXM25M2V1B**. La presenza di S21 e le funzioni disponibili
 vanno verificate sul proprio modello: la compatibilità con altre unità non è garantita.

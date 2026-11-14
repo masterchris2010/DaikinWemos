@@ -77,6 +77,7 @@ class WebTests(unittest.TestCase):
         self.requests = []
         self.errors = []
         self.state = dict(STATE)
+        self.humidity_response = {'trace': {'ok': True}, 'payload': '30 35 30'}
         self.page.on('pageerror', lambda error: self.errors.append(str(error)))
         self.context.route('**/api/**', self.route)
         self.page.goto(self.base_url + '/')
@@ -90,6 +91,10 @@ class WebTests(unittest.TestCase):
             route.fulfill(json=[])
         elif path == '/api/learning/download':
             route.fulfill(body='timestamp,online,room,outside,target,prediction10m\n1794522600,1,20,10,21,20.5\n1794522630,1,20.1,10,21,\n')
+        elif path == '/api/debug/probe':
+            self.requests.append((path, parse_qs(route.request.post_data or '')))
+            self.assertEqual(route.request.headers.get('x-debug-request'), '1')
+            route.fulfill(json=self.humidity_response)
         else:
             data = parse_qs(route.request.post_data or '')
             self.requests.append((path, data))
@@ -308,6 +313,29 @@ class WebTests(unittest.TestCase):
         self.page.locator('#pinsForm button').click()
         self.assertIn('diversi', self.page.locator('#pinsMessage').inner_text())
         self.assertEqual(self.requests, [])
+
+    def test_humidity_decoder_rejects_invalid_values(self):
+        for payload, expected in [('39 37 30', 79), ('30 35 30', 50), ('30 30 31', 100),
+                                  ('39 39 39', None), ('', None), ('ZZ 30 30', None), ('41 30 30', None)]:
+            self.assertEqual(self.page.evaluate('(payload)=>decodeHumidityPayload(payload)', payload), expected)
+
+    def test_humidity_probe_warns_about_fixed_50_percent(self):
+        self.state['debugActive'] = True
+        self.page.evaluate('refresh()')
+        self.select_section('debug')
+        self.page.locator('#probeHumidity').click()
+        self.page.wait_for_function("!busy && document.getElementById('humidityProbeResult').textContent.includes('50%')")
+        self.assertIn('non confermata', self.page.locator('#humidityProbeResult').inner_text())
+        self.assertEqual(self.requests[-1], ('/api/debug/probe', {'command': ['Re']}))
+
+    def test_humidity_unsupported_does_not_show_a_measurement(self):
+        self.state['debugActive'] = True
+        self.humidity_response = {'trace': {'ok': False, 'error': 'NAK'}, 'payload': ''}
+        self.page.evaluate('refresh()')
+        self.select_section('debug')
+        self.page.locator('#probeHumidity').click()
+        self.page.wait_for_function("!busy && document.getElementById('humidityProbeResult').textContent.includes('non ha fornito')")
+        self.assertNotIn('%', self.page.locator('#humidityProbeResult').inner_text())
 
     def test_legacy_csv_and_optional_forecasts(self):
         self.select_section('learning')

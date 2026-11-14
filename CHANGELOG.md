@@ -1,5 +1,12 @@
 # Modifiche
 
+## 2.15
+
+- Abilitato il comando di sola lettura Re nelle sonde debug per l'umidita S21.
+- Pulsante Leggi umidita S21 nel pannello Debug, con validazione della risposta.
+- Segnalato il valore fisso 50% come non confermato, per le unita senza sensore.
+- La lettura diagnostica non modifica i comandi o il ciclo di polling del climatizzatore.
+
 ## 2.14
 
 - Home ridisegnata con ghiera centrale, colori caldo/freddo, nome stanza e sensori compatti.

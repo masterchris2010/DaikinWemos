@@ -17,7 +17,7 @@ jobs:
       - run: python -m platformio run
       - uses: actions/upload-artifact@v4
         with:
-          name: DaikinWemos-2.14-D1-mini
+          name: DaikinWemos-2.15-D1-mini
           path: .pio/build/d1_mini/firmware.bin
   tests:
     runs-on: ubuntu-latest

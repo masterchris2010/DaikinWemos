@@ -1,4 +1,4 @@
-# Manuale DaikinWemos 2.14
+# Manuale DaikinWemos 2.15
 
 ## DAIKIN WEMOS - VERSIONE AUTONOMA PER ARDUINO IDE
 
@@ -59,7 +59,7 @@ alla rete domestica il portale resta disponibile.
 
 ## AGGIORNAMENTO FIRMWARE DAL BROWSER
 Se e' gia' presente la 1.3 con aggiornamento web, caricare il .bin dal browser.
-Con versioni precedenti, installare lo sketch 2.14 via USB con Arduino IDE.
+Con versioni precedenti, installare lo sketch 2.15 via USB con Arduino IDE.
 Al riavvio aprire il Monitor seriale a 115200 baud e leggere la riga
 'Chiave aggiornamento firmware'. La chiave e' specifica del Wemos e resta
 in memoria insieme alle impostazioni di rete. Se non compare, premere RST.
@@ -240,3 +240,12 @@ aprono i rispettivi controlli. La X, Escape o un tocco sullo sfondo chiudono
 un pannello. Gli orari e le impostazioni restano raggiungibili anche dal menu.
 La prossima azione viene calcolata dalle regole abilitate con l'orologio del
 Wemos; in assenza di sincronizzazione compare un messaggio esplicito.
+
+## VERIFICA UMIDITA S21 - v2.15
+
+Con debug attivo e Daikin collegato, usare Debug > Leggi umidita S21.
+Il firmware invia il comando Re, valida la risposta Se e mostra il dato grezzo.
+Un valore 50% puo essere una risposta fissa di un'unita priva di sensore:
+va confrontato con un igrometro e osservato nel tempo. Una risposta NAK,
+mancante o fuori intervallo non viene presentata come umidita misurata.
+Il dato resta diagnostico: non compare nella Home o nello storico dei campioni.
