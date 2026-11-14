@@ -1,0 +1,30 @@
+# Modifiche
+
+## 2.11
+
+- Menu laterale a scomparsa con le sette sezioni e chiusura dopo la scelta.
+- Layout per smartphone e aree toccabili di almeno 44 pixel per i controlli principali.
+- Navigazione con tastiera, chiusura con Escape e gestione del focus nel menu.
+
+## 2.10
+
+- Rimosso Applica impostazioni; invio automatico di alimentazione, modalità e ventola.
+- Ritardo configurabile per la temperatura; zero applica immediatamente.
+- Le modifiche durante un invio in corso attendono la sua conclusione.
+
+## 2.9
+
+- TX e RX configurabili e salvati in EEPROM.
+- Predefiniti definitivi: TX D7, RX D6. Mantenute le assegnazioni già salvate.
+
+## 2.8
+
+- Grafico sul Wemos con intervalli 1, 6, 24 ore o tutto lo storico.
+- Temperature ambiente, esterna e impostata, con previsioni quando disponibili.
+- Compatibilità con i CSV precedenti senza la colonna delle previsioni.
+
+## Funzioni precedenti
+
+Controllo S21, Wi-Fi, IP statico, aggiornamenti web, debug persistente,
+orari settimanali, timer di spegnimento, temi, compensazione riscaldamento,
+raccolta dati LittleFS e modello neurale in osservazione.
