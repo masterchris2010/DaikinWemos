@@ -2,7 +2,7 @@
 
 Controllo locale di un climatizzatore Daikin con interfaccia S21 tramite
 Wemos D1 mini (ESP8266), con pagina web integrata e senza Home Assistant.
-Versione corrente: **2.12**. Progetto indipendente, non affiliato a Daikin.
+Versione corrente: **2.13**. Progetto indipendente, non affiliato a Daikin.
 
 Sviluppato per **FTXM25M2V1B**. La presenza di S21 e le funzioni disponibili
 vanno verificate sul proprio modello: la compatibilità con altre unità non è garantita.
@@ -53,7 +53,7 @@ Non collegare segnali a 5 V direttamente ai GPIO dell'ESP8266.
    e OTA disponibile; selezionare la propria porta seriale, velocità 115200.
 4. Verificare e caricare con la sola USB collegata.
 
-Le librerie sono incluse nel core ESP8266. La pagina web è nello sketch:
+Le librerie sono incluse nel core ESP8266. La pagina web compressa è nello sketch:
 non occorre caricare un'immagine del filesystem. Mantenere lo stesso layout
 4 MB / FS 1 MB per conservare archivio e impostazioni negli aggiornamenti.
 
@@ -120,13 +120,27 @@ python -m playwright install chromium
 python -m unittest discover -s tests -v
 ```
 
-I test usano dati sintetici e un browser con risposte API simulate: non inviano
+I test servono la pagina gzip con un vero server HTTP locale e usano risposte API simulate: non inviano
 comandi a un climatizzatore. Controllano navigazione mobile, applicazione automatica,
 pin e compatibilità del CSV, oltre alla preparazione dei dati di apprendimento.
-GitHub Actions compila il firmware ed esegue i test; produce il binario come artefatto.
+GitHub Actions compila il firmware ed esegue i test in Chromium e Firefox; produce il binario come artefatto.
 Le funzioni S21 dipendono dall'unità e richiedono verifica hardware.
 
 ## Licenza
 
 [GPL-3.0-or-later](LICENSE), coerente con l'intestazione dello sketch.
 I marchi citati appartengono ai rispettivi titolari.
+
+## Modifica della pagina web
+
+Dopo aver modificato HTML, CSS o JavaScript nello sketch, eseguire:
+
+```sh
+python tools/pack_web.py
+```
+
+Questo rigenera i byte gzip incorporati nello stesso file `.ino`. Il firmware
+serve quella copia compressa, con cache disabilitata. I test verificano che
+corrisponda esattamente al sorgente e che il browser completi l'avvio.
+Lo sketch distribuito è già pronto e si compila anche con Arduino IDE.
+Le richieste hanno un limite di attesa; lo stato non avvia letture sovrapposte.

@@ -1,4 +1,4 @@
-# Manuale DaikinWemos 2.12
+# Manuale DaikinWemos 2.13
 
 ## DAIKIN WEMOS - VERSIONE AUTONOMA PER ARDUINO IDE
 
@@ -59,7 +59,7 @@ alla rete domestica il portale resta disponibile.
 
 ## AGGIORNAMENTO FIRMWARE DAL BROWSER
 Se e' gia' presente la 1.3 con aggiornamento web, caricare il .bin dal browser.
-Con versioni precedenti, installare lo sketch 2.12 via USB con Arduino IDE.
+Con versioni precedenti, installare lo sketch 2.13 via USB con Arduino IDE.
 Al riavvio aprire il Monitor seriale a 115200 baud e leggere la riga
 'Chiave aggiornamento firmware'. La chiave e' specifica del Wemos e resta
 in memoria insieme alle impostazioni di rete. Se non compare, premere RST.
@@ -215,3 +215,12 @@ La barra mostra il nome della sezione corrente. I comandi hanno aree
 toccabili di almeno 44 pixel; modalita, pin e orari si dispongono in colonne
 adatte agli schermi stretti. Interfaccia verificata con dati simulati a
 320, 390, 430 e 844 pixel, inclusi i controlli di applicazione automatica.
+
+## RECUPERO INTERFACCIA
+
+Se la pagina resta su Connessione e i comandi non rispondono, caricare la
+versione 2.13 via USB con Arduino IDE, selezionando D1 mini e la porta corretta.
+Collegare soltanto la USB, con Daikin e step-down scollegati. Mantenere il
+layout della flash 4 MB / FS 1 MB. Dopo l'aggiornamento ricaricare la pagina
+con Ctrl+F5. La pagina compressa della 2.13 non viene conservata in cache.
+Un eventuale errore di avvio mostra un avviso, anziché restare silenzioso.

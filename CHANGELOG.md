@@ -1,5 +1,14 @@
 # Modifiche
 
+## 2.13
+
+- Pagina web gzip da circa 17 KiB, anziché oltre 60 KiB, per ridurre il trasferimento dal Wemos.
+- Disabilitata la cache della pagina e aggiunto un avviso di mancato avvio dello script.
+- Limite di attesa sulle richieste, attivo anche durante la lettura del corpo della risposta.
+- Impediti aggiornamenti dello stato sovrapposti e liberati i comandi dopo un timeout.
+- Compatibilità senza ResizeObserver e verifica della pagina compressa tramite HTTP reale.
+- Test estesi a Chromium e Firefox, incluse risposte interrotte e timer.
+
 ## 2.12
 
 - Nome del dispositivo modificabile in Preferenze e salvato in EEPROM.
