@@ -1,4 +1,4 @@
-# Manuale DaikinWemos 2.13
+# Manuale DaikinWemos 2.14
 
 ## DAIKIN WEMOS - VERSIONE AUTONOMA PER ARDUINO IDE
 
@@ -59,7 +59,7 @@ alla rete domestica il portale resta disponibile.
 
 ## AGGIORNAMENTO FIRMWARE DAL BROWSER
 Se e' gia' presente la 1.3 con aggiornamento web, caricare il .bin dal browser.
-Con versioni precedenti, installare lo sketch 2.13 via USB con Arduino IDE.
+Con versioni precedenti, installare lo sketch 2.14 via USB con Arduino IDE.
 Al riavvio aprire il Monitor seriale a 115200 baud e leggere la riga
 'Chiave aggiornamento firmware'. La chiave e' specifica del Wemos e resta
 in memoria insieme alle impostazioni di rete. Se non compare, premere RST.
@@ -75,7 +75,8 @@ La configurazione Wi-Fi e' dentro Preferenze.
 
 ## TIMER DI SPEGNIMENTO
 
-Nella Home scegliere 15 minuti, 30 minuti, 1 ora o 2 ore, oppure Durata
+Nella Home toccare Spegnimento automatico, oppure l'icona orologio in alto.
+Scegliere 15 minuti, 30 minuti, 1 ora o 2 ore, oppure Durata
 personalizzata per inserire ore e minuti (da un minuto a 24 ore).
 Premere Imposta spegnimento: la sola scelta della durata non avvia il timer.
 Il timer attivo mostra il tempo rimanente e l'ora prevista di spegnimento,
@@ -224,3 +225,18 @@ Collegare soltanto la USB, con Daikin e step-down scollegati. Mantenere il
 layout della flash 4 MB / FS 1 MB. Dopo l'aggiornamento ricaricare la pagina
 con Ctrl+F5. La pagina compressa della 2.13 non viene conservata in cache.
 Un eventuale errore di avvio mostra un avviso, anziché restare silenzioso.
+
+## INTERFACCIA A GHIERA - v2.14
+
+Il nome della stanza e le temperature ambiente/esterna sono sopra la ghiera.
+Usare i pulsanti meno e piu per modificare la temperatura, oppure toccare il
+numero e scriverla. L'applicazione conserva il ritardo scelto in Preferenze.
+La ghiera usa corallo in Riscaldamento, azzurro in Raffrescamento e grigio
+quando il climatizzatore e spento. Il pulsante verde in alto controlla
+l'alimentazione. Il pulsante sulla ghiera apre Turbo ed Eco.
+Le righe Modalita e Ventola aprono un pannello dal basso; la selezione si
+applica e richiude il pannello. Direzione aria e Spegnimento automatico
+aprono i rispettivi controlli. La X, Escape o un tocco sullo sfondo chiudono
+un pannello. Gli orari e le impostazioni restano raggiungibili anche dal menu.
+La prossima azione viene calcolata dalle regole abilitate con l'orologio del
+Wemos; in assenza di sincronizzazione compare un messaggio esplicito.

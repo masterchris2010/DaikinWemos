@@ -1,5 +1,14 @@
 # Modifiche
 
+## 2.14
+
+- Home ridisegnata con ghiera centrale, colori caldo/freddo, nome stanza e sensori compatti.
+- Accensione rapida nell'intestazione e controlli meno frequenti in pannelli dal basso.
+- Modalita, ventola, direzione aria, timer e programmazione accessibili da righe compatte.
+- Prossima azione calcolata dalla programmazione e dall'orologio del Wemos.
+- Pannelli chiudibili anche quando il Daikin si scollega; temi e layout smartphone verificati.
+- Conservate pagina gzip, protezioni dai timeout, pin e impostazioni esistenti.
+
 ## 2.13
 
 - Pagina web gzip da circa 17 KiB, anziché oltre 60 KiB, per ridurre il trasferimento dal Wemos.

@@ -18,7 +18,8 @@ COMPRESSED = bytes(int(byte, 16) for byte in re.findall(r'0x([0-9a-f]{2})', SOUR
 STATE = dict(online=True, known=True, power=True, mode='4', fan='A', target=20,
              requestedTarget=20, room=18.5, outside=11, internalTarget=20,
              fanRpm=850, rxPin=12, txPin=13, heatOffset=0, archiveReady=True,
-             archiveBytes=1200, archiveBufferedRows=2, addressMode='dhcp')
+             archiveBytes=1200, archiveBufferedRows=2, addressMode='dhcp', swingKnown=True,
+             nextSchedule='Oggi · 18:30 · 21.0 °C')
 
 
 class PageHandler(BaseHTTPRequestHandler):
@@ -97,12 +98,26 @@ class WebTests(unittest.TestCase):
             elif path == '/api/sleep':
                 minutes = int(data['minutes'][0])
                 self.state.update(sleepActive=minutes > 0, sleepSeconds=minutes * 60)
+            elif path == '/api/set':
+                self.state.update(power=data['power'][0] == '1', mode=data['mode'][0],
+                                  requestedTarget=float(data['temp'][0]), target=float(data['temp'][0]))
+                if 'fan' in data:
+                    self.state['fan'] = data['fan'][0]
             route.fulfill(body='OK')
 
     def select_section(self, name):
+        self.close_sheet()
         self.page.locator('#menuToggle').click()
         self.page.locator('#tab-' + name).click()
         self.assertTrue(self.page.locator('#sectionMenu').is_hidden())
+
+    def close_sheet(self):
+        sheet = self.page.locator('dialog[open]')
+        if sheet.count():
+            sheet.locator('[data-close]').click()
+
+    def open_timer(self):
+        self.page.locator('#timerQuick').click()
 
     def test_navigation_and_no_overflow_at_phone_widths(self):
         for width in [320, 390, 430, 844]:
@@ -134,6 +149,7 @@ class WebTests(unittest.TestCase):
     def test_timeout_unlocks_commands_and_menu(self):
         self.page.route('**/api/sleep', lambda route: route.continue_())
         self.page.evaluate('window.request = ((original) => (path,options) => original(path,options,50))(request)')
+        self.open_timer()
         self.page.locator('#startSleep').click()
         self.page.wait_for_function("!busy && document.getElementById('sleepMessage').textContent.includes('Connessione interrotta')")
         self.select_section('preferences')
@@ -175,6 +191,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.page.locator('#deviceName').input_value(), name)
 
     def test_timer_presets_countdown_and_cancel(self):
+        self.open_timer()
         self.page.locator('[data-sleep="60"]').click()
         self.assertIn('1 ora', self.page.locator('#sleepPreview').inner_text())
         self.assertEqual(self.requests, [])
@@ -190,6 +207,7 @@ class WebTests(unittest.TestCase):
         self.assertTrue(self.page.locator('#sleepActiveCard').is_hidden())
 
     def test_timer_custom_duration_and_invalid_limits(self):
+        self.open_timer()
         self.page.locator('[data-sleep="custom"]').click()
         self.page.locator('#sleepHours').fill('1')
         self.page.locator('#sleepMinutes').fill('45')
@@ -218,6 +236,47 @@ class WebTests(unittest.TestCase):
         self.page.locator('#menuBackdrop').click(position={'x': 5, 'y': 300})
         self.assertTrue(self.page.locator('#sectionMenu').is_hidden())
 
+    def test_dial_mode_colors_and_quick_power(self):
+        self.assertEqual(self.page.locator('#dialMode').inner_text(), 'RISCALDAMENTO')
+        hot = self.page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent')")
+        self.page.locator('#modeRow').click()
+        self.page.locator('#modeChoices label').filter(has=self.page.locator('input[value="3"]')).click()
+        self.page.wait_for_function("!busy && !editing && document.documentElement.dataset.mode === '3'")
+        self.assertEqual(self.page.locator('#dialMode').inner_text(), 'RAFFRESCAMENTO')
+        cold = self.page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent')")
+        self.assertNotEqual(hot, cold)
+        self.assertTrue(self.page.locator('#modeDialog').is_hidden())
+        self.page.locator('#quickPower').click()
+        self.page.wait_for_function("!busy && !editing && document.body.dataset.power === 'off'")
+        self.assertEqual(self.requests[-1][1]['power'], ['0'])
+        self.assertEqual(self.page.locator('#dialMode').inner_text(), 'SPENTO')
+        self.assertEqual(self.page.locator('#quickPower').get_attribute('aria-pressed'), 'false')
+
+    def test_sheets_on_small_screens_and_dark_theme(self):
+        self.page.evaluate("document.documentElement.dataset.theme='dark'")
+        for width in [320, 390, 430]:
+            self.page.set_viewport_size({'width': width, 'height': 844})
+            for button, sheet in [('modeRow','modeDialog'),('fanRow','fanDialog'),
+                                  ('airRow','airDialog'),('timerQuick','timerDialog'),
+                                  ('quickFunctions','specialDialog')]:
+                self.page.locator('#'+button).click()
+                self.assertTrue(self.page.locator('#'+sheet).is_visible())
+                self.assertTrue(self.page.locator('#'+sheet).evaluate('(el)=>el.scrollWidth<=el.clientWidth'))
+                self.close_sheet()
+        self.select_section('preferences')
+        self.open_timer()
+        self.assertTrue(self.page.locator('#timerDialog').is_visible())
+
+    def test_modal_can_close_after_daikin_disconnects(self):
+        self.page.locator('#modeRow').click()
+        self.state['online'] = False
+        self.page.evaluate('refresh()')
+        self.assertTrue(self.page.locator('#modeChoices input').first.is_disabled())
+        self.assertTrue(self.page.locator('#modeDialog [data-close]').is_enabled())
+        self.close_sheet()
+        self.select_section('preferences')
+        self.assertTrue(self.page.locator('#panel-preferences').is_visible())
+
     def test_automatic_changes_preserve_fan_for_temperature_only(self):
         self.assertEqual(self.page.locator('#controls .primary').count(), 0)
         self.page.evaluate('autoApplySeconds = 0')
@@ -225,6 +284,7 @@ class WebTests(unittest.TestCase):
         self.page.wait_for_function('busy === false && editing === false')
         self.assertEqual(self.requests[-1][1]['temp'], ['20.5'])
         self.assertNotIn('fan', self.requests[-1][1])
+        self.page.locator('#fanRow').click()
         self.page.locator('#fanChoices label').filter(has=self.page.locator('input[value="7"]')).click()
         self.page.wait_for_function('busy === false && editing === false')
         self.assertEqual(self.requests[-1][1]['fan'], ['7'])
