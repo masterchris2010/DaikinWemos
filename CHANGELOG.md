@@ -1,5 +1,14 @@
 # Modifiche
 
+## 2.12
+
+- Nome del dispositivo modificabile in Preferenze e salvato in EEPROM.
+- Nome visualizzato nell'intestazione e nel titolo della pagina, con indirizzo di rete invariato.
+- Timer con durate rapide 15/30 minuti, 1/2 ore e durata personalizzata in ore e minuti.
+- Conto alla rovescia, ora prevista di spegnimento e annullamento nella scheda del timer attivo.
+- Menu: Home, Programmazione Orari, Apprendimento, Preferenze, Firmware, Debug.
+- Configurazione Wi-Fi spostata in Preferenze; il vecchio collegamento #wifi resta valido.
+
 ## 2.11
 
 - Menu laterale a scomparsa con le sette sezioni e chiusura dopo la scelta.

@@ -34,6 +34,7 @@ class WebTests(unittest.TestCase):
         self.page = self.context.new_page()
         self.requests = []
         self.errors = []
+        self.state = dict(STATE)
         self.page.on('pageerror', lambda error: self.errors.append(str(error)))
         self.context.route('**/*', self.route)
         self.page.goto('http://wemos.test/')
@@ -44,13 +45,19 @@ class WebTests(unittest.TestCase):
         if path == '/':
             route.fulfill(content_type='text/html', body=HTML)
         elif path == '/api/state':
-            route.fulfill(json=STATE)
+            route.fulfill(json=self.state)
         elif path == '/api/schedule' and route.request.method == 'GET':
             route.fulfill(json=[])
         elif path == '/api/learning/download':
             route.fulfill(body='timestamp,online,room,outside,target,prediction10m\n1794522600,1,20,10,21,20.5\n1794522630,1,20.1,10,21,\n')
         else:
-            self.requests.append((path, parse_qs(route.request.post_data or '')))
+            data = parse_qs(route.request.post_data or '')
+            self.requests.append((path, data))
+            if path == '/api/device-name':
+                self.state['deviceName'] = data['name'][0]
+            elif path == '/api/sleep':
+                minutes = int(data['minutes'][0])
+                self.state.update(sleepActive=minutes > 0, sleepSeconds=minutes * 60)
             route.fulfill(body='OK')
 
     def select_section(self, name):
@@ -61,11 +68,70 @@ class WebTests(unittest.TestCase):
     def test_navigation_and_no_overflow_at_phone_widths(self):
         for width in [320, 390, 430, 844]:
             self.page.set_viewport_size({'width': width, 'height': 844})
-            for name in ['wifi', 'schedule', 'firmware', 'debug', 'learning', 'preferences', 'home']:
+            for name in ['schedule', 'learning', 'preferences', 'firmware', 'debug', 'home']:
                 self.select_section(name)
                 self.assertTrue(self.page.locator('#panel-' + name).is_visible())
                 self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, name))
         self.assertEqual(self.errors, [])
+
+    def test_menu_order_and_wifi_inside_preferences(self):
+        self.assertEqual(self.page.locator('.tabs button').all_text_contents(),
+                         ['Home', 'Programmazione Orari', 'Apprendimento', 'Preferenze', 'Firmware', 'Debug'])
+        self.select_section('preferences')
+        self.page.locator('#wifiSettings summary').click()
+        self.assertTrue(self.page.locator('#ssid').is_visible())
+        self.page.locator('#addressModeChoices label').filter(has=self.page.locator('input[value="static"]')).click()
+        self.assertTrue(self.page.locator('#staticIp').is_visible())
+        self.page.goto('http://wemos.test/#wifi')
+        self.assertTrue(self.page.locator('#panel-preferences').is_visible())
+        self.assertTrue(self.page.locator('#ssid').is_visible())
+
+    def test_device_name_saved_and_rendered_as_text(self):
+        self.select_section('preferences')
+        name = '<b>Studio</b>'
+        self.page.locator('#deviceName').fill(name)
+        self.page.locator('#deviceNameForm button').click()
+        self.page.wait_for_function("document.getElementById('deviceBrand').textContent === '<b>Studio</b>'")
+        self.assertEqual(self.requests[-1], ('/api/device-name', {'name': [name]}))
+        self.assertEqual(self.page.title(), name)
+        self.assertEqual(self.page.locator('#deviceBrand b').count(), 0)
+        self.page.reload()
+        self.page.wait_for_function("document.getElementById('deviceBrand').textContent === '<b>Studio</b>'")
+        self.assertEqual(self.page.locator('#deviceName').input_value(), name)
+
+    def test_timer_presets_countdown_and_cancel(self):
+        self.page.locator('[data-sleep="60"]').click()
+        self.assertIn('1 ora', self.page.locator('#sleepPreview').inner_text())
+        self.assertEqual(self.requests, [])
+        self.page.locator('#startSleep').click()
+        self.page.wait_for_function('sleepActive === true')
+        self.assertEqual(self.requests[-1], ('/api/sleep', {'minutes': ['60']}))
+        self.assertTrue(self.page.locator('#sleepActiveCard').is_visible())
+        self.assertIn('Spegnimento alle', self.page.locator('#sleepEndTime').inner_text())
+        self.assertEqual(self.page.locator('#startSleep').inner_text(), 'Aggiorna spegnimento')
+        self.page.locator('#cancelSleep').click()
+        self.page.wait_for_function('sleepActive === false')
+        self.assertEqual(self.requests[-1], ('/api/sleep', {'minutes': ['0']}))
+        self.assertTrue(self.page.locator('#sleepActiveCard').is_hidden())
+
+    def test_timer_custom_duration_and_invalid_limits(self):
+        self.page.locator('[data-sleep="custom"]').click()
+        self.page.locator('#sleepHours').fill('1')
+        self.page.locator('#sleepMinutes').fill('45')
+        self.page.locator('#startSleep').click()
+        self.page.wait_for_function('sleepActive === true')
+        self.assertEqual(self.requests[-1], ('/api/sleep', {'minutes': ['105']}))
+        count = len(self.requests)
+        for hours, minutes in [('0', '0'), ('24', '1')]:
+            self.page.locator('#sleepHours').fill(hours)
+            self.page.locator('#sleepMinutes').fill(minutes)
+            self.page.locator('#startSleep').click()
+            self.assertEqual(len(self.requests), count)
+            self.assertFalse(self.page.locator('#sleepForm').evaluate('(form) => form.checkValidity()'))
+        self.page.locator('[data-sleep="15"]').click()
+        self.page.locator('#startSleep').click()
+        self.page.wait_for_function('busy === false')
+        self.assertEqual(self.requests[-1], ('/api/sleep', {'minutes': ['15']}))
 
     def test_menu_escape_and_backdrop(self):
         self.page.locator('#menuToggle').click()

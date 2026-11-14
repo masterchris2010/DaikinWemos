@@ -1,5 +1,5 @@
 /*
-  DaikinWemos 2.11 - ESP8266 Wemos D1 mini / Daikin S21.
+  DaikinWemos 2.12 - ESP8266 Wemos D1 mini / Daikin S21.
   Pagina web e configurazione Wi-Fi incluse: nessun upload LittleFS.
   Arduino IDE: core "esp8266 by ESP8266 Community" 3.1.2,
   scheda "LOLIN(WEMOS) D1 R2 & mini", CPU 80 MHz, flash 4 MB.
@@ -49,6 +49,16 @@ struct NeuralModel {
   uint32_t checksum;
 };
 static_assert(MODEL_ADDRESS + sizeof(NeuralModel) <= 2048, "Model exceeds EEPROM");
+static const int DEVICE_NAME_ADDRESS = 1200;
+static const uint32_t DEVICE_NAME_MAGIC = 0x44574E4D;
+struct DeviceNameSettings {
+  uint32_t magic;
+  char name[49];
+  uint32_t checksum;
+};
+static_assert(MODEL_ADDRESS + sizeof(NeuralModel) <= DEVICE_NAME_ADDRESS, "Name overlaps model");
+static_assert(DEVICE_NAME_ADDRESS + sizeof(DeviceNameSettings) <= 2048, "Name exceeds EEPROM");
+String deviceName = "Daikin Wemos";
 NeuralModel neuralModel = {};
 float neuralPrediction = NAN;
 String neuralStatus = "Modello non caricato";
@@ -222,6 +232,9 @@ bool readSpecial(char command, uint8_t (&data)[4]);
 void handleWifi();
 void setupRoutes();
 void loadFirmwareKey();
+bool validDeviceName(const String &name);
+void loadDeviceName();
+void saveDeviceName();
 void loadPins();
 void savePins();
 bool validS21Pin(uint32_t pin);
@@ -428,8 +441,25 @@ input{max-width:100%;min-width:0}
  #pinsForm .choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(prefers-reduced-motion:no-preference){.section-menu:not([hidden]){animation:menu-reveal .18s ease-out}@keyframes menu-reveal{from{transform:translateX(100%)}to{transform:translateX(0)}}}
+
+.brand{overflow-wrap:anywhere}
+#deviceNameForm{margin-bottom:24px}
+.wifi-settings{border-top:1px solid var(--line);margin-top:24px;padding-top:18px}
+.wifi-settings summary{min-height:44px;padding:8px 0}
+.sleep-legend{font-size:14px;font-weight:650;margin-bottom:10px;color:var(--muted)}
+.sleep-presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.sleep-presets button{padding:10px 4px}
+.sleep-presets button[aria-pressed=true]{background:var(--blue);border-color:var(--blue);color:white;font-weight:650}
+.sleep-custom{grid-column:1/-1}
+.sleep-active{border:1px solid var(--line);border-radius:16px;background:#edf7fc;padding:16px;margin-bottom:20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.sleep-active strong{font-size:clamp(32px,10vw,44px);font-variant-numeric:tabular-nums;line-height:1.2}
+.sleep-active button{margin-top:6px;width:100%}
+#sleepPreview{font-size:14px;margin-top:14px;line-height:1.5}
+#sleepIdle{margin-bottom:18px;font-size:14px}
+#sleepHint{font-size:13px}
+:root[data-theme="dark"] .sleep-active{background:#243a50}
 </style></head><body>
-<header><div class="bar"><span class="brand">Daikin Wemos</span>
+<header><div class="bar"><span class="brand" id="deviceBrand">Daikin Wemos</span>
 <button id="menuToggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="sectionMenu" aria-label="Apri menu sezioni"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span id="currentSection">Home</span></button>
 <span id="connection" class="badge">Connessione…</span></div></header>
 <div id="menuBackdrop" class="menu-backdrop" hidden></div>
@@ -437,12 +467,11 @@ input{max-width:100%;min-width:0}
 <div class="menu-heading"><strong>Menu</strong><button id="menuClose" class="menu-close" type="button" aria-label="Chiudi menu">×</button></div>
 <div class="tabs" role="tablist" aria-label="Sezioni del Wemos" aria-orientation="vertical">
 <button id="tab-home" type="button" role="tab" aria-controls="panel-home" aria-selected="true" tabindex="0">Home</button>
-<button id="tab-wifi" type="button" role="tab" aria-controls="panel-wifi" aria-selected="false" tabindex="-1">Wi-Fi</button>
-<button id="tab-schedule" type="button" role="tab" aria-controls="panel-schedule" aria-selected="false" tabindex="-1">Orari</button>
-<button id="tab-firmware" type="button" role="tab" aria-controls="panel-firmware" aria-selected="false" tabindex="-1">Firmware</button>
-<button id="tab-debug" type="button" role="tab" aria-controls="panel-debug" aria-selected="false" tabindex="-1">Debug</button>
+<button id="tab-schedule" type="button" role="tab" aria-controls="panel-schedule" aria-selected="false" tabindex="-1">Programmazione Orari</button>
 <button id="tab-learning" type="button" role="tab" aria-controls="panel-learning" aria-selected="false" tabindex="-1">Apprendimento</button>
 <button id="tab-preferences" type="button" role="tab" aria-controls="panel-preferences" aria-selected="false" tabindex="-1">Preferenze</button>
+<button id="tab-firmware" type="button" role="tab" aria-controls="panel-firmware" aria-selected="false" tabindex="-1">Firmware</button>
+<button id="tab-debug" type="button" role="tab" aria-controls="panel-debug" aria-selected="false" tabindex="-1">Debug</button>
 </div></nav>
 <main id="mainContent">
 <div id="panel-home" role="tabpanel" aria-labelledby="tab-home" tabindex="0">
@@ -492,42 +521,37 @@ input{max-width:100%;min-width:0}
 <button class="tile" id="turbo" type="button" aria-pressed="false" disabled><strong>Turbo</strong><span id="turboState">Lettura…</span></button>
 <button class="tile" id="eco" type="button" aria-pressed="false" disabled><strong>Eco</strong><span id="ecoState">Lettura…</span></button>
 </div><p id="specialMessage" role="status"></p></section>
-<section class="card"><h2>Timer di spegnimento</h2>
-<form id="sleepForm" class="wifi">
-<label for="sleepMinutes">Spegni tra quanti minuti?</label>
-<input id="sleepMinutes" name="minutes" type="number" min="1" max="1440" step="1" value="30" required>
-<div class="choices" style="margin-top:10px">
-<button class="secondary" type="button" data-sleep="15">15 min</button>
-<button class="secondary" type="button" data-sleep="30">30 min</button>
-<button class="secondary" type="button" data-sleep="60">1 ora</button>
+<section class="card sleep-card"><h2>Spegnimento automatico</h2>
+<div id="sleepActiveCard" class="sleep-active" hidden>
+<span class="muted">Tempo rimanente</span><strong id="sleepCountdown" role="timer" aria-live="off"></strong>
+<span id="sleepEndTime"></span>
+<button class="secondary" id="cancelSleep" type="button" disabled>Annulla spegnimento</button>
 </div>
-<button class="primary" id="startSleep" disabled>Avvia timer</button>
-</form><p id="sleepCountdown" role="status" class="muted"></p>
-<button class="secondary" id="cancelSleep" type="button" disabled>Annulla timer</button>
-<p id="sleepMessage" role="status"></p>
+<p id="sleepIdle" class="muted">Nessuno spegnimento programmato.</p>
+<form id="sleepForm" class="wifi">
+<fieldset><legend class="sleep-legend">Spegni tra</legend>
+<div class="sleep-presets" role="group" aria-label="Durata del timer">
+<button class="secondary" type="button" data-sleep="15" aria-pressed="false">15 min</button>
+<button class="secondary" type="button" data-sleep="30" aria-pressed="true">30 min</button>
+<button class="secondary" type="button" data-sleep="60" aria-pressed="false">1 ora</button>
+<button class="secondary" type="button" data-sleep="120" aria-pressed="false">2 ore</button>
+<button class="secondary sleep-custom" type="button" data-sleep="custom" aria-pressed="false" aria-controls="sleepCustom">Durata personalizzata</button>
+</div>
+<div class="grid" id="sleepCustom" hidden>
+<label for="sleepHours">Ore<input id="sleepHours" type="number" inputmode="numeric" min="0" max="24" step="1" value="0" disabled required></label>
+<label for="sleepMinutes">Minuti<input id="sleepMinutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="30" disabled required></label>
+</div></fieldset>
+<p id="sleepPreview" class="muted">Si spegnerà tra 30 minuti.</p>
+<button class="primary" id="startSleep" disabled>Imposta spegnimento</button>
+<small id="sleepHint">Accendi il climatizzatore per impostare lo spegnimento.</small>
+</form><p id="sleepMessage" role="status"></p>
 </section>
 <section class="card"><h2>Direzione dell’aria</h2><form id="swing"><fieldset id="swingFields" disabled>
 <label class="check"><input id="vertical" name="vertical" type="checkbox" value="1">Oscillazione verticale</label>
 <label class="check"><input id="horizontal" name="horizontal" type="checkbox" value="1">Oscillazione orizzontale</label>
 <button class="secondary">Applica oscillazione</button></fieldset></form><p id="swingMessage" role="status"></p></section>
 </div>
-<section class="card" id="panel-wifi" role="tabpanel" aria-labelledby="tab-wifi" tabindex="0" hidden><h2>Configurazione Wi-Fi</h2><p id="network"></p>
-<form id="wifi" class="wifi"><label for="ssid">Nome rete Wi-Fi (2,4 GHz)</label><input id="ssid" name="ssid" maxlength="32" required autocomplete="off">
-<label for="password">Password Wi-Fi</label><input id="password" name="password" type="password" maxlength="63" autocomplete="new-password" placeholder="Lascia vuoto per mantenere la password salvata">
-<label class="check"><input id="openNetwork" name="openNetwork" type="checkbox" value="1">Rete senza password</label>
-<fieldset id="addressModeChoices" class="choice-group"><legend>Assegnazione indirizzo</legend>
-<div class="choices pair">
-<label class="choice"><input type="radio" name="addressMode" value="dhcp" required><span>DHCP</span></label>
-<label class="choice"><input type="radio" name="addressMode" value="static" required><span>IP statico</span></label>
-</div></fieldset>
-<div id="staticFields" hidden>
-<label for="staticIp">Indirizzo IPv4</label><input id="staticIp" name="staticIp" inputmode="decimal" placeholder="192.168.1.50">
-<label for="mask">Maschera di sottorete</label><input id="mask" name="mask" inputmode="decimal" placeholder="255.255.255.0">
-<label for="gateway">Gateway</label><input id="gateway" name="gateway" inputmode="decimal" placeholder="192.168.0.1">
-<label for="dns">DNS (facoltativo)</label><input id="dns" name="dns" inputmode="decimal" placeholder="Predefinito: gateway">
-</div>
-<button class="primary">Salva e riavvia</button></form><p id="wifiMessage" role="status"></p></section>
-<section class="card" id="panel-schedule" role="tabpanel" aria-labelledby="tab-schedule" tabindex="0" hidden><h2>Programmazione settimanale</h2>
+<section class="card" id="panel-schedule" role="tabpanel" aria-labelledby="tab-schedule" tabindex="0" hidden><h2>Programmazione Orari</h2>
 <p id="scheduleClock" class="muted">Lettura orologio…</p>
 <p id="scheduleResult" role="status"></p>
 <form id="scheduleForm" class="wifi">
@@ -537,7 +561,7 @@ input{max-width:100%;min-width:0}
 <button id="saveSchedule" class="primary" type="submit" disabled>Salva programmazione</button>
 </form><p id="scheduleMessage" role="status"></p>
 </section>
-<section class="card" id="panel-firmware" role="tabpanel" aria-labelledby="tab-firmware" tabindex="0" hidden><h2>Aggiornamento firmware · v2.11</h2>
+<section class="card" id="panel-firmware" role="tabpanel" aria-labelledby="tab-firmware" tabindex="0" hidden><h2>Aggiornamento firmware · v2.12</h2>
 <form id="firmwareForm" class="wifi">
 <p class="muted">Seleziona il file .bin compilato per il Wemos D1 mini.</p>
 <label for="firmwareFile">File firmware</label>
@@ -558,6 +582,13 @@ input{max-width:100%;min-width:0}
 </div></form><p id="debugMessage" role="status"></p>
 </section>
 <section class="card" id="panel-preferences" role="tabpanel" aria-labelledby="tab-preferences" tabindex="0" hidden><h2>Preferenze</h2>
+<form id="deviceNameForm" class="wifi">
+<label for="deviceName">Nome del dispositivo</label>
+<input id="deviceName" name="name" maxlength="32" placeholder="Es. Clima soggiorno" autocomplete="off" required>
+<small>Il nome appare in alto e nel titolo della pagina. L’indirizzo di rete resta invariato.</small>
+<button class="primary">Salva nome</button>
+</form><p id="deviceNameMessage" role="status"></p>
+
 <fieldset class="choice-group"><legend>Tema</legend><div class="choices">
 <label class="choice"><input type="radio" name="theme" value="auto" checked><span>Automatico</span></label>
 <label class="choice"><input type="radio" name="theme" value="light"><span>Chiaro</span></label>
@@ -581,7 +612,23 @@ input{max-width:100%;min-width:0}
 <fieldset class="choice-group"><legend>RX del Wemos ← TX del Daikin</legend><div class="choices"><label class="choice"><input type="radio" name="rx" value="5"><span>D1 · GPIO5</span></label><label class="choice"><input type="radio" name="rx" value="4"><span>D2 · GPIO4</span></label><label class="choice"><input type="radio" name="rx" value="14"><span>D5 · GPIO14</span></label><label class="choice"><input type="radio" name="rx" value="12" checked><span>D6 · GPIO12</span></label><label class="choice"><input type="radio" name="rx" value="13"><span>D7 · GPIO13</span></label></div></fieldset>
 <small>Scegli due pin diversi. Il cambio è immediato e rimane salvato anche dopo il riavvio. Per modificare i fili togli alimentazione; mantieni il convertitore di livello. Predefiniti: TX D7, RX D6.</small>
 <button class="primary">Salva pin TX / RX</button>
-</form><p id="pinsMessage" role="status"></p></section>
+</form><p id="pinsMessage" role="status"></p><details class="wifi-settings" id="wifiSettings"><summary>Configurazione Wi-Fi</summary><p id="network"></p>
+<form id="wifi" class="wifi"><label for="ssid">Nome rete Wi-Fi (2,4 GHz)</label><input id="ssid" name="ssid" maxlength="32" required autocomplete="off">
+<label for="password">Password Wi-Fi</label><input id="password" name="password" type="password" maxlength="63" autocomplete="new-password" placeholder="Lascia vuoto per mantenere la password salvata">
+<label class="check"><input id="openNetwork" name="openNetwork" type="checkbox" value="1">Rete senza password</label>
+<fieldset id="addressModeChoices" class="choice-group"><legend>Assegnazione indirizzo</legend>
+<div class="choices pair">
+<label class="choice"><input type="radio" name="addressMode" value="dhcp" required><span>DHCP</span></label>
+<label class="choice"><input type="radio" name="addressMode" value="static" required><span>IP statico</span></label>
+</div></fieldset>
+<div id="staticFields" hidden>
+<label for="staticIp">Indirizzo IPv4</label><input id="staticIp" name="staticIp" inputmode="decimal" placeholder="192.168.1.50">
+<label for="mask">Maschera di sottorete</label><input id="mask" name="mask" inputmode="decimal" placeholder="255.255.255.0">
+<label for="gateway">Gateway</label><input id="gateway" name="gateway" inputmode="decimal" placeholder="192.168.0.1">
+<label for="dns">DNS (facoltativo)</label><input id="dns" name="dns" inputmode="decimal" placeholder="Predefinito: gateway">
+</div>
+<button class="primary">Salva e riavvia</button></form><p id="wifiMessage" role="status"></p></details>
+</section>
 <section class="card" id="panel-learning" role="tabpanel" aria-labelledby="tab-learning" tabindex="0" hidden>
 <h2>Apprendimento · Osservazione</h2>
 <h3>Andamento della temperatura</h3>
@@ -653,6 +700,7 @@ document.addEventListener('keydown', event => {
   }
 });
 function activateTab(id, focus = false) {
+  if (id === 'tab-wifi') { id = 'tab-preferences'; $('wifiSettings').open = true; }
   const selected = tabButtons.find(button => button.id === id) || tabButtons[0];
   for (const button of tabButtons) {
     const active = button === selected;
@@ -853,26 +901,64 @@ let sleepRemaining = 0;
 let sleepObservedAt = 0;
 let sleepActive = false;
 let sleepStatus = '';
+let selectedSleep = '30';
+function sleepDurationMinutes() {
+  return selectedSleep === 'custom' ? Number($('sleepHours').value)*60+Number($('sleepMinutes').value) : Number(selectedSleep);
+}
+function updateSleepPreview() {
+  const minutes = sleepDurationMinutes();
+  const valid = Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440;
+  $('sleepMinutes').setCustomValidity(valid ? '' : 'Scegli una durata tra 1 minuto e 24 ore.');
+  if (!valid) { $('sleepPreview').textContent = 'Scegli una durata tra 1 minuto e 24 ore.'; return; }
+  const hours = Math.floor(minutes/60), rest = minutes%60;
+  const duration = [hours ? hours+(hours===1?' ora':' ore') : '', rest ? rest+(rest===1?' minuto':' minuti') : ''].filter(Boolean).join(' e ');
+  $('sleepPreview').textContent = (sleepActive ? 'Nuova durata: ' : 'Si spegnerà tra ')+duration+'.';
+}
 function renderSleepCountdown() {
   const elapsed = Math.floor((performance.now() - sleepObservedAt) / 1000);
   const seconds = Math.max(0, sleepRemaining - elapsed);
-  if (!sleepActive) {
-    $('sleepCountdown').textContent = sleepStatus || 'Nessun timer attivo';
-    return;
-  }
-  $('sleepCountdown').textContent = seconds
-    ? 'Spegnimento tra ' + Math.floor(seconds / 60) + ' min ' + String(seconds % 60).padStart(2, '0') + ' s'
-    : 'Spegnimento in corso…';
+  $('sleepActiveCard').hidden = !sleepActive;
+  $('sleepIdle').hidden = sleepActive;
+  $('sleepIdle').textContent = sleepStatus || 'Nessuno spegnimento programmato.';
+  $('startSleep').textContent = sleepActive ? 'Aggiorna spegnimento' : 'Imposta spegnimento';
+  updateSleepPreview();
+  if (!sleepActive) return;
+  const hours = Math.floor(seconds/3600), minutes = Math.floor(seconds%3600/60);
+  $('sleepCountdown').textContent = seconds ? (hours ? hours+':' : '')+String(minutes).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0') : 'Spegnimento…';
+  $('sleepEndTime').textContent = seconds ? 'Spegnimento alle '+new Intl.DateTimeFormat('it-IT',{hour:'2-digit',minute:'2-digit'}).format(new Date(Date.now()+seconds*1000)) : 'In attesa della conferma del Daikin';
 }
 setInterval(renderSleepCountdown, 1000);
 $('sleepForm').onsubmit = event => {
   event.preventDefault();
-  send('/api/sleep', new FormData(event.target), 'sleepMessage');
+  updateSleepPreview();
+  if (!$('sleepForm').reportValidity()) return;
+  const minutes = sleepDurationMinutes();
+  if (minutes < 1 || minutes > 1440) return;
+  send('/api/sleep', {minutes}, 'sleepMessage');
 };
 $('cancelSleep').onclick = () => send('/api/sleep', {minutes:0}, 'sleepMessage');
 for (const button of document.querySelectorAll('[data-sleep]')) {
-  button.onclick = () => { $('sleepMinutes').value = button.dataset.sleep; };
+  button.onclick = () => {
+    selectedSleep = button.dataset.sleep;
+    const custom = selectedSleep === 'custom';
+    $('sleepCustom').hidden = !custom;
+    $('sleepHours').disabled = $('sleepMinutes').disabled = !custom;
+    for(const other of document.querySelectorAll('[data-sleep]')) other.setAttribute('aria-pressed',String(other===button));
+    updateSleepPreview();
+  };
 }
+$('sleepHours').oninput = $('sleepMinutes').oninput = updateSleepPreview;
+let deviceNameEdited = false;
+$('deviceName').oninput = () => { deviceNameEdited = true; };
+$('deviceNameForm').onsubmit = event => {
+  event.preventDefault();
+  const name = $('deviceName').value.trim();
+  if (!name || new TextEncoder().encode(name).length > 48) {
+    $('deviceNameMessage').textContent = 'Il nome è troppo lungo o vuoto. Usa meno caratteri o simboli.';
+    return;
+  }
+  send('/api/device-name', {name}, 'deviceNameMessage');
+};
 $('archiveForm').onsubmit = async event => {
   event.preventDefault();
   if (busy) return;
@@ -1131,6 +1217,10 @@ $('controls').addEventListener('input', event => {
 $('swing').addEventListener('input',()=>editing=true);
 async function refresh(){if(busy)return;try{const r=await fetch('/api/state',{cache:'no-store'});if(!r.ok)throw Error('Errore HTTP '+r.status);const s=await r.json();
 lastLiveState = s;
+const name = s.deviceName || 'Daikin Wemos';
+$('deviceBrand').textContent = name;
+document.title = name;
+if (!deviceNameEdited) $('deviceName').value = name;
 $('archiveStatus').textContent = s.archiveStatus || 'Archivio non disponibile';
 $('archiveInfo').textContent = s.archiveReady
   ? Math.round((s.archiveBytes || 0) / 1024) + ' KiB salvati · ' + (s.archiveBufferedRows || 0) + ' campioni in attesa di salvataggio'
@@ -1153,6 +1243,7 @@ renderSleepCountdown();
 
 $('startSleep').disabled = !s.online || !s.power;
 $('cancelSleep').disabled = !sleepActive;
+$('sleepHint').hidden = s.online && s.power;
 $('debugState').textContent = s.debugActive
   ? 'Attivo sulla rete locale · fino alla disattivazione manuale'
   : 'Disattivato';
@@ -1194,7 +1285,7 @@ $('tempReadback').textContent = s.online && s.target != null
   : '';
 }catch(e){for (const id of ['roomValue', 'outsideValue', 'fanRpmValue']) $(id).textContent = '—';
 $('connection').textContent='Wemos non raggiungibile';$('connection').className='badge bad';renderSpecial('turbo',null,false);renderSpecial('eco',null,false);$('basic').disabled=true;$('swingFields').disabled=true;$('startSleep').disabled=true;}}
-async function send(path,data,out){if(busy)return;const sentRevision=controlsRevision;busy=true;$(out).textContent='Invio in corso...';try{const r=await fetch(path,{method:'POST',body:new URLSearchParams(data)});const text=await r.text();$(out).textContent=text;if(path==='/api/set'&&(r.ok||r.status===409)&&sentRevision===controlsRevision){editing=false;fanEdited=false;}else if(path==='/api/swing'&&r.ok&&!fanEdited)editing=false;else if(path==='/api/heat-offset'&&r.ok)offsetEdited=false;else if(path==='/api/pins'&&r.ok)pinsEdited=false;}catch(e){$(out).textContent='Connessione interrotta: verifica lo stato prima di riprovare.';}finally{busy=false;refresh();}}
+async function send(path,data,out){if(busy)return;const sentRevision=controlsRevision;busy=true;$(out).textContent='Invio in corso...';try{const r=await fetch(path,{method:'POST',body:new URLSearchParams(data)});const text=await r.text();$(out).textContent=text;if(path==='/api/set'&&(r.ok||r.status===409)&&sentRevision===controlsRevision){editing=false;fanEdited=false;}else if(path==='/api/swing'&&r.ok&&!fanEdited)editing=false;else if(path==='/api/heat-offset'&&r.ok)offsetEdited=false;else if(path==='/api/pins'&&r.ok)pinsEdited=false;else if(path==='/api/device-name'&&r.ok)deviceNameEdited=false;}catch(e){$(out).textContent='Connessione interrotta: verifica lo stato prima di riprovare.';}finally{busy=false;refresh();}}
 $('controls').onsubmit=e=>{e.preventDefault();queueAutoApply(0);};
 $('swing').onsubmit=e=>{e.preventDefault();send('/api/swing',{vertical:$('vertical').checked?'1':'0',horizontal:$('horizontal').checked?'1':'0'},'swingMessage');};
 $('heatOffsetForm').onsubmit = event => {
@@ -1573,6 +1664,7 @@ void handleStatus() {
   String json;
   json.reserve(440);
   json = F("{\"online\":"); json += online ? "true" : "false";
+  json += F(",\"deviceName\":"); appendJsonString(json, deviceName.c_str());
   json += F(",\"known\":"); json += ac.known ? "true" : "false";
   json += F(",\"power\":"); json += ac.power ? "true" : "false";
   json += F(",\"mode\":\""); json += ac.mode;
@@ -1629,7 +1721,7 @@ void handleStatus() {
   json += F(",\"archiveStatus\":"); appendJsonString(json, archiveStatus.c_str());
   json += F(",\"archiveBytes\":"); json += archiveBytes();
   json += F(",\"archiveBufferedRows\":"); json += archiveBufferedRows;
-  json += F(",\"version\":\"2.11\",\"debugActive\":");
+  json += F(",\"version\":\"2.12\",\"debugActive\":");
   json += debugEnabled ? "true" : "false";
   json += '}';
   server.sendHeader("Cache-Control", "no-store");
@@ -1965,6 +2057,48 @@ void handleDebugProbe() {
   json += '}';
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", json);
+}
+
+bool validDeviceName(const String &name) {
+  if (name.length() == 0 || name.length() > 48) return false;
+  for (size_t i = 0; i < name.length(); ++i) {
+    const uint8_t c = static_cast<uint8_t>(name[i]);
+    if (c < 32 || c == 127) return false;
+  }
+  return true;
+}
+
+void loadDeviceName() {
+  DeviceNameSettings settings = {};
+  EEPROM.get(DEVICE_NAME_ADDRESS, settings);
+  if (settings.magic == DEVICE_NAME_MAGIC && settings.name[48] == '\0' &&
+      settings.checksum == configChecksum(&settings, offsetof(DeviceNameSettings, checksum))) {
+    String name(settings.name);
+    name.trim();
+    if (validDeviceName(name)) deviceName = name;
+  }
+}
+
+void saveDeviceName() {
+  String name = server.arg("name");
+  name.trim();
+  if (!validDeviceName(name)) {
+    server.send(400, "text/plain; charset=utf-8", "Inserisci un nome più breve, senza caratteri di controllo.");
+    return;
+  }
+  if (name != deviceName) {
+    DeviceNameSettings settings = {};
+    settings.magic = DEVICE_NAME_MAGIC;
+    name.toCharArray(settings.name, sizeof(settings.name));
+    settings.checksum = configChecksum(&settings, offsetof(DeviceNameSettings, checksum));
+    EEPROM.put(DEVICE_NAME_ADDRESS, settings);
+    if (!EEPROM.commit()) {
+      server.send(500, "text/plain; charset=utf-8", "Salvataggio del nome non riuscito.");
+      return;
+    }
+    deviceName = name;
+  }
+  server.send(200, "text/plain; charset=utf-8", "Nome del dispositivo salvato.");
 }
 
 bool validS21Pin(uint32_t pin) {
@@ -2444,7 +2578,7 @@ void tickArchive() {
   row = date;
   row += ','; row += uint32_t(now);
   row += ','; row += online ? '1' : '0';
-  row += F(",2.11,"); row += ac.mode;
+  row += F(",2.12,"); row += ac.mode;
   row += ','; row += ac.fan;
   row += ','; row += online ? csvNumber(ac.room) : "";
   row += ','; row += online ? csvNumber(ac.outside) : "";
@@ -2516,6 +2650,7 @@ void setupRoutes() {
   server.on("/api/learning/model", HTTP_POST, uploadNeuralModel);
   server.on("/api/learning/archive", HTTP_POST, initializeArchive);
   server.on("/api/learning/download", HTTP_GET, downloadArchive);
+  server.on("/api/device-name", HTTP_POST, saveDeviceName);
   server.on("/api/pins", HTTP_POST, savePins);
   server.on("/api/heat-offset", HTTP_POST, saveHeatOffset);
   server.on("/api/schedule", HTTP_GET, readSchedule);
@@ -2534,7 +2669,8 @@ void setup() {
   Serial.begin(115200);
   EEPROM.begin(2048);
   loadPins();
-  Serial.printf("\nDaikinWemos 2.11 - RX GPIO%u / TX GPIO%u - S21 2400 8E2\n", rxPin, txPin);
+  loadDeviceName();
+  Serial.printf("\nDaikinWemos 2.12 - RX GPIO%u / TX GPIO%u - S21 2400 8E2\n", rxPin, txPin);
   s21.begin(2400, EspSoftwareSerial::SWSERIAL_8E2, rxPin, txPin, false);
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);

@@ -1,4 +1,4 @@
-# Manuale DaikinWemos 2.11
+# Manuale DaikinWemos 2.12
 
 ## DAIKIN WEMOS - VERSIONE AUTONOMA PER ARDUINO IDE
 
@@ -59,7 +59,7 @@ alla rete domestica il portale resta disponibile.
 
 ## AGGIORNAMENTO FIRMWARE DAL BROWSER
 Se e' gia' presente la 1.3 con aggiornamento web, caricare il .bin dal browser.
-Con versioni precedenti, installare lo sketch 2.11 via USB con Arduino IDE.
+Con versioni precedenti, installare lo sketch 2.12 via USB con Arduino IDE.
 Al riavvio aprire il Monitor seriale a 115200 baud e leggere la riga
 'Chiave aggiornamento firmware'. La chiave e' specifica del Wemos e resta
 in memoria insieme alle impostazioni di rete. Se non compare, premere RST.
@@ -70,16 +70,29 @@ Per compilare un proprio .bin usare Sketch > Esporta binario compilato
 in Arduino IDE, con la stessa scheda e lo stesso layout della flash.
 Usare il pannello sulla rete locale. Gli aggiornamenti vanno eseguiti sulla rete locale.
 
-Il menu a scomparsa contiene Home, Wi-Fi, Orari, Firmware, Debug, Apprendimento e Preferenze.
+Il menu a scomparsa contiene Home, Programmazione Orari, Apprendimento, Preferenze, Firmware e Debug.
+La configurazione Wi-Fi e' dentro Preferenze.
 
 ## TIMER DI SPEGNIMENTO
-Nella Home inserire da 1 a 1440 minuti e premere Avvia timer.
-I pulsanti 15 min, 30 min e 1 ora compilano il campo. Il conto alla rovescia
-e' mostrato nella Home e prosegue anche chiudendo il browser.
-Annulla timer lo cancella. Il riavvio del Wemos e lo spegnimento dello
-split annullano il timer. Alla scadenza il Wemos invia OFF e verifica
-la risposta. Se manca la conferma ritenta per un massimo di un minuto.
+
+Nella Home scegliere 15 minuti, 30 minuti, 1 ora o 2 ore, oppure Durata
+personalizzata per inserire ore e minuti (da un minuto a 24 ore).
+Premere Imposta spegnimento: la sola scelta della durata non avvia il timer.
+Il timer attivo mostra il tempo rimanente e l'ora prevista di spegnimento,
+calcolata con l'orologio del browser. Aggiorna spegnimento sostituisce il
+timer con la nuova durata; Annulla spegnimento lo cancella.
+Il conteggio prosegue anche chiudendo il browser. Il riavvio del Wemos e
+lo spegnimento dello split annullano il timer. Alla scadenza il Wemos invia
+OFF e verifica la risposta, ritentando per un massimo di un minuto.
 Il timer funziona anche senza sincronizzazione NTP.
+
+## NOME DEL DISPOSITIVO
+
+In Preferenze inserire un nome, per esempio Clima soggiorno, e premere
+Salva nome. Il nome compare nell'intestazione e nel titolo della pagina,
+e resta salvato anche dopo il riavvio. Il campo ammette fino a 32 caratteri,
+con un limite di 48 byte UTF-8 per i caratteri accentati o i simboli.
+Il nome non cambia l'indirizzo IP, il nome mDNS o la rete di configurazione.
 
 ## PROGRAMMAZIONE SETTIMANALE
 Aprire la scheda Orari e aggiungere fino a otto orari.
@@ -195,7 +208,7 @@ sempre attraverso il convertitore di livello.
 Le assegnazioni personalizzate gia salvate rimangono valide dopo l'aggiornamento.
 
 INTERFACCIA SMARTPHONE - v2.11
-Le sezioni sono nascoste nel menu laterale, aperto dal pulsante in alto.
+Le sei sezioni sono nascoste nel menu laterale, aperto dal pulsante in alto.
 Scegliere una sezione per aprirla e chiudere il menu. Si puo chiudere anche
 con la X, toccando lo sfondo oppure premendo Escape sulla tastiera.
 La barra mostra il nome della sezione corrente. I comandi hanno aree
