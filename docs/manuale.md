@@ -1,4 +1,4 @@
-# Manuale DaikinWemos 2.15
+# Manuale DaikinWemos 2.16
 
 ## DAIKIN WEMOS - VERSIONE AUTONOMA PER ARDUINO IDE
 
@@ -59,7 +59,7 @@ alla rete domestica il portale resta disponibile.
 
 ## AGGIORNAMENTO FIRMWARE DAL BROWSER
 Se e' gia' presente la 1.3 con aggiornamento web, caricare il .bin dal browser.
-Con versioni precedenti, installare lo sketch 2.15 via USB con Arduino IDE.
+Con versioni precedenti, installare lo sketch 2.16 via USB con Arduino IDE.
 Al riavvio aprire il Monitor seriale a 115200 baud e leggere la riga
 'Chiave aggiornamento firmware'. La chiave e' specifica del Wemos e resta
 in memoria insieme alle impostazioni di rete. Se non compare, premere RST.
@@ -249,3 +249,15 @@ Un valore 50% puo essere una risposta fissa di un'unita priva di sensore:
 va confrontato con un igrometro e osservato nel tempo. Una risposta NAK,
 mancante o fuori intervallo non viene presentata come umidita misurata.
 Il dato resta diagnostico: non compare nella Home o nello storico dei campioni.
+
+## APPRENDIMENTO AUTOMATICO - v2.16
+
+Dopo l'installazione il Wemos apprende dalle nuove letture, in osservazione.
+La pagina Apprendimento mostra i progressi e permette di sospendere/riprendere
+e salvare subito. Il salvataggio automatico è ogni ora; in caso di interruzione
+si possono perdere i progressi successivi all'ultimo salvataggio.
+La verifica richiede dati futuri e un miglioramento rispetto ai metodi semplici.
+Tutti i modelli restano informativi: il climatizzatore segue i comandi abituali.
+Per compilare in Arduino IDE tenere OnlineLearning.h accanto al file .ino.
+Nella Home accensione e menu sono rispettivamente a sinistra e destra; il
+conto alla rovescia attivo appare sopra Prossima azione programmata.

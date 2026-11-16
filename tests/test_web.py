@@ -1,3 +1,4 @@
+import copy
 import gzip
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -19,7 +20,11 @@ STATE = dict(online=True, known=True, power=True, mode='4', fan='A', target=20,
              requestedTarget=20, room=18.5, outside=11, internalTarget=20,
              fanRpm=850, rxPin=12, txPin=13, heatOffset=0, archiveReady=True,
              archiveBytes=1200, archiveBufferedRows=2, addressMode='dhcp', swingKnown=True,
-             nextSchedule='Oggi · 18:30 · 21.0 °C')
+             nextSchedule='Oggi · 18:30 · 21.0 °C',
+             onlineLearning=dict(enabled=True,phase='collecting',ready=True,examples=500,
+                                 activeHours=1.5,activeExamples=120,requiredActiveExamples=2400,
+                                 validationActive=0,validationTotal=0,candidate10m=20.2,
+                                 mae=.15,baselineMae=.1,trendMae=.12,storage='Salvataggio automatico ogni ora',savedAt=0))
 
 
 class PageHandler(BaseHTTPRequestHandler):
@@ -76,7 +81,7 @@ class WebTests(unittest.TestCase):
         self.page = self.context.new_page()
         self.requests = []
         self.errors = []
-        self.state = dict(STATE)
+        self.state = copy.deepcopy(STATE)
         self.humidity_response = {'trace': {'ok': True}, 'payload': '30 35 30'}
         self.page.on('pageerror', lambda error: self.errors.append(str(error)))
         self.context.route('**/api/**', self.route)
@@ -108,6 +113,9 @@ class WebTests(unittest.TestCase):
                                   requestedTarget=float(data['temp'][0]), target=float(data['temp'][0]))
                 if 'fan' in data:
                     self.state['fan'] = data['fan'][0]
+            elif path == '/api/learning/online' and 'enabled' in data:
+                enabled = data['enabled'][0] == '1'
+                self.state['onlineLearning'].update(enabled=enabled, phase='collecting' if enabled else 'paused')
             route.fulfill(body='OK')
 
     def select_section(self, name):
@@ -206,10 +214,16 @@ class WebTests(unittest.TestCase):
         self.assertTrue(self.page.locator('#sleepActiveCard').is_visible())
         self.assertIn('Spegnimento alle', self.page.locator('#sleepEndTime').inner_text())
         self.assertEqual(self.page.locator('#startSleep').inner_text(), 'Aggiorna spegnimento')
+        self.close_sheet()
+        self.assertTrue(self.page.locator('#homeSleepBanner').is_visible())
+        self.assertTrue(self.page.evaluate("document.getElementById('homeSleepBanner').getBoundingClientRect().bottom <= document.querySelector('.next-action').getBoundingClientRect().top"))
+        self.page.locator('#homeSleepBanner').click()
+        self.assertTrue(self.page.locator('#timerDialog').is_visible())
         self.page.locator('#cancelSleep').click()
         self.page.wait_for_function('sleepActive === false')
         self.assertEqual(self.requests[-1], ('/api/sleep', {'minutes': ['0']}))
         self.assertTrue(self.page.locator('#sleepActiveCard').is_hidden())
+        self.assertTrue(self.page.locator('#homeSleepBanner').is_hidden())
 
     def test_timer_custom_duration_and_invalid_limits(self):
         self.open_timer()
@@ -318,6 +332,36 @@ class WebTests(unittest.TestCase):
         for payload, expected in [('39 37 30', 79), ('30 35 30', 50), ('30 30 31', 100),
                                   ('39 39 39', None), ('', None), ('ZZ 30 30', None), ('41 30 30', None)]:
             self.assertEqual(self.page.evaluate('(payload)=>decodeHumidityPayload(payload)', payload), expected)
+
+    def test_online_learning_status_pause_and_save_are_observation_only(self):
+        self.select_section('learning')
+        self.assertEqual(self.page.locator('#onlineExamples').inner_text(), '500')
+        self.assertEqual(self.page.locator('#onlineHours').inner_text(), '1.5')
+        self.assertIn('provvisoria', self.page.locator('#onlineCandidate').inner_text())
+        self.page.locator('#onlineToggle').click()
+        self.page.wait_for_function('!busy && !lastLiveState.onlineLearning.enabled')
+        self.assertEqual(self.requests[-1], ('/api/learning/online', {'enabled': ['0']}))
+        self.assertIn('sospeso', self.page.locator('#onlinePhase').inner_text())
+        self.page.locator('#onlineToggle').click()
+        self.page.wait_for_function('!busy && lastLiveState.onlineLearning.enabled')
+        self.page.locator('#onlineSave').click()
+        self.page.wait_for_function('!busy')
+        self.assertEqual(self.requests[-1], ('/api/learning/online', {'save': ['1']}))
+        self.assertFalse(any(path == '/api/set' for path, data in self.requests))
+
+    def test_power_left_menu_right_and_timer_banner_hidden_when_idle(self):
+        power = self.page.locator('#quickPower').bounding_box()
+        menu = self.page.locator('#menuToggle').bounding_box()
+        self.assertLess(power['x'], menu['x'])
+        self.assertTrue(self.page.locator('#homeSleepBanner').is_hidden())
+
+    def test_active_timer_banner_fits_narrow_dark_screen(self):
+        self.state.update(sleepActive=True, sleepSeconds=6300)
+        self.page.set_viewport_size({'width': 320, 'height': 844})
+        self.page.evaluate("document.documentElement.dataset.theme='dark';refresh()")
+        self.assertTrue(self.page.locator('#homeSleepBanner').is_visible())
+        self.assertIn('1:45:', self.page.locator('#homeSleepRemaining').inner_text())
+        self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
 
     def test_humidity_probe_warns_about_fixed_50_percent(self):
         self.state['debugActive'] = True

@@ -2,7 +2,7 @@
 
 Controllo locale di un climatizzatore Daikin con interfaccia S21 tramite
 Wemos D1 mini (ESP8266), con pagina web integrata e senza Home Assistant.
-Versione corrente: **2.15**. Progetto indipendente, non affiliato a Daikin.
+Versione corrente: **2.16**. Progetto indipendente, non affiliato a Daikin.
 
 Sviluppato per **FTXM25M2V1B**. La presenza di S21 e le funzioni disponibili
 vanno verificate sul proprio modello: la compatibilità con altre unità non è garantita.
@@ -22,8 +22,9 @@ vanno verificate sul proprio modello: la compatibilità con altre unità non è 
 - Raccolta CSV in LittleFS, grafico delle temperature e previsione neurale a dieci minuti.
 
 La rete neurale lavora **in osservazione**: non controlla il climatizzatore.
-Il modello si addestra sul PC e viene esportato solo se supera i confronti
-con previsioni semplici. Non è incluso un modello addestrato né lo storico di una casa.
+Il Wemos può apprendere autonomamente dalle nuove letture; il caricamento di
+un modello addestrato sul PC resta facoltativo. I modelli locali devono superare
+una verifica su dati futuri rispetto a previsioni semplici. Non è incluso un modello addestrato né lo storico di una casa.
 
 ## Hardware
 
@@ -54,7 +55,7 @@ Non collegare segnali a 5 V direttamente ai GPIO dell'ESP8266.
    e OTA disponibile; selezionare la propria porta seriale, velocità 115200.
 4. Verificare e caricare con la sola USB collegata.
 
-Le librerie sono incluse nel core ESP8266. La pagina web compressa è nello sketch:
+Le librerie sono incluse nel core ESP8266. Tenere `OnlineLearning.h` nella stessa cartella dello sketch. La pagina web compressa è nello sketch:
 non occorre caricare un'immagine del filesystem. Mantenere lo stesso layout
 4 MB / FS 1 MB per conservare archivio e impostazioni negli aggiornamenti.
 
@@ -155,3 +156,31 @@ Schermate con dati simulati, in riscaldamento e raffrescamento:
 Il pulsante verde in alto accende o spegne il climatizzatore. I comandi
 meno frequenti si aprono toccando una riga; il pulsante sulla ghiera mostra
 Turbo ed Eco. La prossima azione usa le regole e l'orologio del Wemos.
+
+## Apprendimento automatico sul Wemos · v2.16
+
+L'apprendimento è attivo per impostazione predefinita, **in osservazione**.
+Ogni 30 secondi la rete riceve un esempio; la temperatura effettiva fra dieci
+minuti diventa l'etichetta con cui allenarsi. Le sequenze discontinue e quelle
+attraversate da cambi di impostazioni vengono scartate. La rete allena 12
+entrate e 8 neuroni nascosti con memoria fissa, senza librerie ML aggiuntive.
+
+Dopo almeno 2.400 esempi validi da acceso, una copia della rete viene fermata
+e verificata sulle letture successive: almeno 480 esempi, di cui 240 da acceso.
+Deve migliorare di almeno il 10% sia la temperatura costante sia la tendenza;
+se esiste un modello locale verificato, deve migliorare anche quello. Una
+verifica respinta non interrompe l'allenamento. L'accettazione non è garantita.
+Le previsioni da spento sono abilitate solo dopo una verifica specifica.
+
+L'apprendimento locale parte dalle **nuove letture**, senza rileggere i CSV
+precedenti. I progressi vengono salvati ogni ora in due file LittleFS alternati,
+con checksum e ripristino del salvataggio valido più recente. Il buffer delle
+previsioni in attesa non viene ripristinato dopo il riavvio. In Apprendimento
+si possono sospendere/riprendere gli aggiornamenti e usare **Salva ora** prima
+di togliere alimentazione. Un'interruzione può perdere fino a un'ora di progressi.
+I salvataggi manuali sono limitati a uno al minuto; quelli automatici restano orari.
+
+La raccolta CSV continua e aggiunge la colonna facoltativa `onlineCandidate10m`.
+Il modello caricato dal PC, le impostazioni EEPROM e gli orari restano conservati.
+La previsione locale verificata ha precedenza su quella PC; entrambi restano
+soltanto informativi e **non inviano comandi al climatizzatore**.

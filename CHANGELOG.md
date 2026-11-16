@@ -1,5 +1,16 @@
 # Modifiche
 
+## 2.16
+
+- Apprendimento incrementale sul Wemos, con rete piccola e buffer a memoria fissa.
+- Etichette ritardate di dieci minuti e invalidazione in caso di comandi cambiati o letture discontinue.
+- Copia separata per la verifica su dati futuri e confronto con previsioni semplici e modello precedente.
+- Salvataggio orario LittleFS su due file con checksum e recupero dopo riavvio.
+- Contatori, metriche recenti, sospensione/ripresa e salvataggio manuale in Apprendimento.
+- Accensione spostata a sinistra e menu a destra.
+- Timer attivo mostrato sopra Prossima azione programmata, con accesso ai controlli.
+- Colonna CSV aggiuntiva onlineCandidate10m; nessuna modifica automatica ai comandi del climatizzatore.
+
 ## 2.15
 
 - Abilitato il comando di sola lettura Re nelle sonde debug per l'umidita S21.

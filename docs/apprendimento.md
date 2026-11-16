@@ -80,3 +80,24 @@ esterne all'intervallo rappresentato dai dati di addestramento.
 Proseguire l'osservazione su giornate successive: una buona verifica storica
 non garantisce la qualità delle previsioni future. Il repository non contiene
 un modello preaddestrato né dati personali di un impianto.
+
+## Apprendimento locale automatico · v2.16
+
+Il Wemos apprende dalle nuove letture e conserva i pesi in LittleFS. Il modello
+PC è facoltativo. La scheda mostra esempi maturati, ore di letture da acceso,
+errori recenti rispetto a temperatura costante e tendenza, fase della verifica
+e ultimo salvataggio. Gli errori recenti riguardano la rete che si allena; la
+verifica usa una copia separata e ferma su letture future.
+
+Servono almeno 2.400 esempi validi da acceso (20 ore di esempi stabili), poi
+almeno 480 esempi di verifica, di cui 240 da acceso. I tempi effettivi possono
+essere maggiori, perché i primi cinque minuti, i cambi di comando, le letture
+mancanti e le sequenze prive di dieci minuti successivi validi non producono
+esempi. Non è garantito che la rete superi la verifica.
+
+I progressi si salvano ogni ora; **Salva ora** permette di conservarli prima
+di spegnere il Wemos. Due file alternati con checksum proteggono dal salvataggio
+incompleto. L'inizializzazione del filesystem cancella anche questi file.
+La colonna CSV `onlineCandidate10m` contiene la previsione provvisoria, con
+precisione di tre decimali, e non va confusa con una previsione verificata.
+Nessun algoritmo modifica automaticamente temperatura, ventola o alimentazione.
