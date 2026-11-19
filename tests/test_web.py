@@ -82,6 +82,10 @@ class WebTests(unittest.TestCase):
         self.requests = []
         self.errors = []
         self.state = copy.deepcopy(STATE)
+        self.multi = dict(enabled=False, paired=False, ready=True, pending=False, error=0,
+                          lastSchedule='', self=10, manual=['']*7, devices=[])
+        self.shared = []
+        self.multi_jobs = []
         self.humidity_response = {'trace': {'ok': True}, 'payload': '30 35 30'}
         self.page.on('pageerror', lambda error: self.errors.append(str(error)))
         self.context.route('**/api/**', self.route)
@@ -92,7 +96,19 @@ class WebTests(unittest.TestCase):
         path = urlsplit(route.request.url).path
         if path == '/api/state':
             route.fulfill(json=self.state)
-        elif path == '/api/schedule' and route.request.method == 'GET':
+        elif path == '/api/multi/devices':
+            route.fulfill(json=self.multi)
+        elif path == '/api/multi/jobs' and route.request.method == 'GET':
+            route.fulfill(json=dict(batch=1, jobs=self.multi_jobs))
+        elif path == '/api/multi/command':
+            self.requests.append((path, parse_qs(route.request.post_data or '')))
+            route.fulfill(json=dict(batch=1, jobs=[dict(id=j['id'],code=0) for j in self.multi_jobs]))
+        elif path == '/api/multi/plans' and route.request.method == 'GET':
+            route.fulfill(json=dict(used=len(self.shared),limit=16,plans=self.shared))
+        elif path == '/api/multi/plans':
+            self.requests.append((path, parse_qs(route.request.post_data or '', keep_blank_values=True)))
+            route.fulfill(body='Programmazione salvata')
+        elif path == '/api/schedule'  and route.request.method == 'GET':
             route.fulfill(json=[])
         elif path == '/api/learning/download':
             route.fulfill(body='timestamp,online,room,outside,target,prediction10m\n1794522600,1,20,10,21,20.5\n1794522630,1,20.1,10,21,\n')
@@ -142,7 +158,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.errors, [])
 
     def test_menu_order_and_wifi_inside_preferences(self):
-        self.assertEqual(self.page.locator('.tabs button').all_text_contents(),
+        self.assertEqual(self.page.locator('.tabs button:not([hidden])').all_text_contents(),
                          ['Home', 'Programmazione Orari', 'Apprendimento', 'Preferenze', 'Firmware', 'Debug'])
         self.select_section('preferences')
         self.page.locator('#wifiSettings summary').click()
@@ -389,3 +405,98 @@ class WebTests(unittest.TestCase):
         self.assertEqual(old[0]['room'], 20)
         self.assertIsNone(old[0]['prediction'])
         self.assertEqual(self.errors, [])
+
+    def open_multi(self):
+        device=dict(id=10, name='Soggiorno', ip='192.168.1.10', version='2.16',
+                    power=True, available=True, mode='4', room=21.4, target=22,
+                    swing=4, turbo=0, eco=-1, fan='A', online=True, paired=True,
+                    age=2, sync=True, syncError=0)
+        self.multi.update(enabled=True,paired=True,devices=[
+            device,dict(device,id=11,name='Camera',ip='192.168.1.11'),
+            dict(device,id=12,name='Cucina',ip='192.168.1.12',online=False,age=51),
+            dict(device,id=13,name='Ospite',ip='192.168.1.13',paired=False)])
+        self.page.evaluate('refreshMulti()')
+        self.select_section('multi')
+        self.page.locator('#multiDevices button').first.wait_for()
+
+    def test_multi_single_wemos_defaults_to_existing_home(self):
+        self.assertTrue(self.page.locator('#tab-multi').is_hidden())
+        self.assertTrue(self.page.locator('#panel-home').is_visible())
+        self.assertTrue(self.page.locator('#plus').is_enabled())
+
+    def test_multi_remote_individual_commands_offline_and_pairing(self):
+        self.open_multi()
+        camera=self.page.locator('#multiDevices button').filter(has_text='Camera')
+        camera.click()
+        self.assertIn('21.4 °C ambiente',camera.inner_text())
+        self.assertEqual(self.page.locator('#multiLocalSchedule').get_attribute('href'),'http://192.168.1.11/#schedule')
+        self.assertTrue(self.page.locator('#multiEco').is_disabled())
+        self.multi_jobs=[dict(id=11,code=200)]
+        self.page.locator('#multiControl [data-multi-command="1,0"]').click()
+        self.page.wait_for_function("document.getElementById('multiResults').textContent.includes('Confermato')")
+        self.assertEqual(self.requests[-1][1]['id'],['11'])
+        self.page.locator('#multiDevices button').filter(has_text='Cucina').click()
+        self.assertTrue(self.page.locator('#multiControl [data-multi-command="1,0"]').is_disabled())
+        self.page.locator('#multiDevices button').filter(has_text='Ospite').click()
+        self.assertTrue(self.page.locator('#multiControl [data-multi-command="1,0"]').is_disabled())
+
+    def test_multi_global_confirmation_and_partial_results(self):
+        self.open_multi()
+        self.page.once('dialog',lambda dialog:dialog.dismiss())
+        self.page.locator('#multiAllOff').click()
+        self.assertFalse(self.requests)
+        self.multi_jobs=[dict(id=10,code=200),dict(id=11,code=409),dict(id=12,code=504)]
+        self.page.once('dialog',lambda dialog:dialog.accept())
+        self.page.locator('#multiAllOff').click()
+        self.page.wait_for_function("document.getElementById('multiCommandStatus').textContent === 'Esiti ricevuti.'")
+        reports=self.page.locator('#multiResults li').all_text_contents()
+        self.assertIn('Soggiorno · Confermato',reports)
+        self.assertTrue(any('Camera' in r and 'non confermato' in r for r in reports))
+        self.assertTrue(any('Cucina' in r and 'Nessuna conferma' in r for r in reports))
+        self.assertEqual(self.requests[-1][1]['confirmed'],['1'])
+
+    def test_multi_shared_plan_individual_and_all_targets_narrow_screen(self):
+        self.page.set_viewport_size(dict(width=320,height=844))
+        self.open_multi()
+        self.page.locator('#multiNewPlan').click()
+        self.page.locator('#multiPlanForm [name=name]').fill('Mattina')
+        first=self.page.locator('.multi-step').first
+        first.locator('.shared-all').uncheck()
+        first.locator('[data-target="11"]').check()
+        self.page.locator('#multiAddStep').click()
+        self.page.locator('.multi-step').last.locator('.shared-mode').select_option('0')
+        self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
+        self.page.locator('#multiPlanForm [type=submit]').click()
+        self.page.wait_for_function("document.getElementById('multiPlanStatus').textContent.includes('salvata')")
+        payload=self.requests[-1][1]
+        self.assertEqual(payload['targets0'],['11'])
+        self.assertEqual(payload['targets1'],[''])
+        self.assertEqual(payload['mode1'],['0'])
+        self.assertEqual(payload['half1'],['0'])
+
+    def test_home_unit_selection_routes_controls_and_cancels_pending_edit(self):
+        self.open_multi()
+        self.select_section('home')
+        self.page.evaluate('autoApplySeconds = 0.5')
+        self.page.locator('#plus').click()
+        self.page.locator('#homeUnit').select_option('11')
+        self.page.wait_for_timeout(650)
+        self.assertFalse(self.requests, 'the previous unit must not receive the pending edit')
+        self.assertEqual(self.page.locator('#deviceBrand').inner_text(), 'Camera')
+        self.multi_jobs=[dict(id=11,code=200)]
+        self.page.evaluate('autoApplySeconds=0')
+        self.page.locator('#plus').click()
+        self.page.wait_for_function("!busy && document.getElementById('message').textContent==='Confermato'")
+        self.assertEqual(self.requests[-1][0], '/api/multi/command')
+        self.assertEqual(self.requests[-1][1]['id'], ['11'])
+        self.assertEqual(self.requests[-1][1]['action'], ['10'])
+        self.assertEqual(self.requests[-1][1]['minutes'], ['45'])
+        self.multi['devices'][1]['online']=False
+        self.page.evaluate('refreshMulti()')
+        self.assertTrue(self.page.locator('#plus').is_disabled())
+        self.assertEqual(self.page.locator('#homeUnit').input_value(),'11')
+        self.page.locator('#homeUnit').select_option('')
+        self.assertTrue(self.page.locator('#plus').is_enabled())
+        self.page.locator('#plus').click()
+        self.page.wait_for_function('!editing && !busy')
+        self.assertEqual(self.requests[-1][0], '/api/set')

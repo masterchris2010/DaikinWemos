@@ -2,6 +2,14 @@
 
 ## 2.16
 
+- Selettore del climatizzatore nella Home per usare la ghiera e i comandi con qualsiasi unità abbinata.
+
+- Multi-Daikin opzionale con scoperta UDP locale e inserimento manuale di IPv4.
+- Abbinamento esplicito, comandi individuali e globali con verifica separata per unità.
+- Programmazioni condivise replicate e persistenti, con destinatari individuali o Tutti.
+- Risoluzione deterministica dei conflitti, conservazione delle eliminazioni e precedenza degli orari locali.
+- Collegamenti diretti alle preferenze e agli orari individuali delle unità abbinate.
+
 - Apprendimento incrementale sul Wemos, con rete piccola e buffer a memoria fissa.
 - Etichette ritardate di dieci minuti e invalidazione in caso di comandi cambiati o letture discontinue.
 - Copia separata per la verifica su dati futuri e confronto con previsioni semplici e modello precedente.

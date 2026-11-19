@@ -19,6 +19,7 @@ vanno verificate sul proprio modello: la compatibilità con altre unità non è 
 - Otto regole settimanali di accensione/spegnimento e timer di spegnimento.
 - Aggiornamenti firmware dal browser con chiave specifica del dispositivo.
 - Debug S21 attivabile e persistente, da disattivare quando non serve.
+- Multi-Daikin opzionale con scoperta locale, controllo individuale e globale e orari condivisi.
 - Raccolta CSV in LittleFS, grafico delle temperature e previsione neurale a dieci minuti.
 
 La rete neurale lavora **in osservazione**: non controlla il climatizzatore.
@@ -55,7 +56,7 @@ Non collegare segnali a 5 V direttamente ai GPIO dell'ESP8266.
    e OTA disponibile; selezionare la propria porta seriale, velocità 115200.
 4. Verificare e caricare con la sola USB collegata.
 
-Le librerie sono incluse nel core ESP8266. Tenere `OnlineLearning.h` nella stessa cartella dello sketch. La pagina web compressa è nello sketch:
+Le librerie sono incluse nel core ESP8266. Aprire la cartella completa dello sketch, con gli header `OnlineLearning.h` e `MultiDaikin*.h` accanto al file `.ino`. La pagina web compressa è nello sketch:
 non occorre caricare un'immagine del filesystem. Mantenere lo stesso layout
 4 MB / FS 1 MB per conservare archivio e impostazioni negli aggiornamenti.
 
@@ -184,3 +185,14 @@ La raccolta CSV continua e aggiunge la colonna facoltativa `onlineCandidate10m`.
 Il modello caricato dal PC, le impostazioni EEPROM e gli orari restano conservati.
 La previsione locale verificata ha precedenza su quella PC; entrambi restano
 soltanto informativi e **non inviano comandi al climatizzatore**.
+
+
+## Multi-Daikin
+
+Abilita Multi-Daikin da Preferenze su ogni scheda da collegare e salva la stessa
+chiave di abbinamento su ciascuna. Dalla sezione Multi-Daikin di qualsiasi scheda
+puoi leggere lo stato delle altre, comandarle e modificare gli orari condivisi.
+Gli orari individuali restano nel pannello Orari della rispettiva scheda.
+
+- [Configurazione, sincronizzazione e collaudo hardware](docs/multi-daikin.md)
+- [API HTTP Multi-Daikin](docs/api-multi-daikin.md)

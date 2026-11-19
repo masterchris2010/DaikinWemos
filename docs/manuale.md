@@ -261,3 +261,12 @@ Tutti i modelli restano informativi: il climatizzatore segue i comandi abituali.
 Per compilare in Arduino IDE tenere OnlineLearning.h accanto al file .ino.
 Nella Home accensione e menu sono rispettivamente a sinistra e destra; il
 conto alla rovescia attivo appare sopra Prossima azione programmata.
+
+## MULTI-DAIKIN
+
+In Preferenze aprire Multi-Daikin e abilitare la funzione su ogni scheda.
+Generare una sola chiave di abbinamento e inserirla su tutte le schede da
+collegare. Ogni salvataggio richiede la chiave firmware della scheda corrente.
+Per la procedura completa, i limiti e il comportamento in caso di perdita
+della rete, consultare [la guida Multi-Daikin](multi-daikin.md).
+La scheda selezionata offre collegamenti diretti a Orari e Preferenze.
